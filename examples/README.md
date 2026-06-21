@@ -20,13 +20,19 @@ Before you start running the examples, make sure to complete the following steps
 npm i
 ```
 
-2. **Setup Credentials:** The jira.js library uses your Jira's `host`, `email`, and `apiToken` to authenticate requests. Specify these in the `src/credentials.ts` file:
+2. **Setup Credentials:** The jira.js library uses your Jira `host`, `email`, and `apiToken` to authenticate requests. Copy the example env file and fill in your values:
 
-```typescript
-const host = 'https://your-domain.atlassian.net';
-const email = 'YOUR_EMAIL';
-const apiToken = 'YOUR_API_TOKEN';
+```console
+cp .env.example .env
 ```
+
+```bash
+HOST=https://your-domain.atlassian.net
+EMAIL=your@email.com
+API_TOKEN=your_api_token
+```
+
+Create an API token at [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens).
 
 ## Examples
 

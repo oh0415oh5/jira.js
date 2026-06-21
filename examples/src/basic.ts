@@ -1,5 +1,5 @@
 import { Version3Client } from 'jira.js';
-import { apiToken, email, host } from './credentials';
+import { apiToken, email, host } from './authConfig';
 
 const client = new Version3Client({
   host,

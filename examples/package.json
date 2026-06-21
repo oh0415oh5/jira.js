@@ -5,14 +5,15 @@
   "description": "",
   "author": "Vladislav Tupikin <mrrefactoring@yandex.ru>",
   "scripts": {
-    "basic": "ts-node src/basic.ts",
-    "addWorklog": "ts-node src/addWorklog.ts",
-    "getAllWorklogs": "ts-node src/getAllWorklogs.ts",
-    "addFixVersion": "ts-node src/addFixVersion.ts"
+    "basic": "ts-node -r dotenv/config src/basic.ts",
+    "addWorklog": "ts-node -r dotenv/config src/addWorklog.ts",
+    "getAllWorklogs": "ts-node -r dotenv/config src/getAllWorklogs.ts",
+    "addFixVersion": "ts-node -r dotenv/config src/addFixVersion.ts"
   },
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^22.5.4",
+    "dotenv": "^17.2.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.4"
   },

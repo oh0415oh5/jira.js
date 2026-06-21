@@ -22,3 +22,15 @@ test('should return Basic authentication token for apiToken case', async ({ expe
 
   expect(token).toBe('Basic dGVzdF9lbWFpbEB0ZXN0LnF3ZTp0ZXN0X2FwaVRva2Vu');
 });
+
+test('should return OAuth2 authentication token for accessToken case', async ({ expect }) => {
+  const authentication: Config['authentication'] = {
+    oauth2: {
+      accessToken: 'test_access_token',
+    },
+  };
+
+  const token = await getAuthenticationToken(authentication);
+
+  expect(token).toBe('Bearer test_access_token');
+});
