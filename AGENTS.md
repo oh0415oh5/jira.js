@@ -1,0 +1,203 @@
+# AGENTS.md
+
+Guidance for AI coding agents working in the **jira.js** repository.
+
+## Project overview
+
+[jira.js](https://github.com/MrRefactoring/jira.js) is a TypeScript/JavaScript client library for Atlassian Jira Cloud APIs. It supports:
+
+- **Version3** — current Jira Platform REST API (`/rest/api/3`)
+- **Version2** — legacy Jira Platform REST API (`/rest/api/2`)
+- **Agile** — Jira Software Agile REST API
+- **ServiceDesk** — Jira Service Management REST API
+
+The library ships dual ESM/CJS builds, works in Node.js (>=20) and browsers, and uses Axios for HTTP.
+
+## Setup
+
+```bash
+pnpm install
+```
+
+Requires **Node.js 20+** and **pnpm 10** (see CI).
+
+For integration tests, create a `.env` file from `.env.example`:
+
+```bash
+cp .env.example .env
+# HOST=https://your-domain.atlassian.net
+# EMAIL=your@email.com
+# API_TOKEN=your_api_token
+```
+
+## Commands
+
+| Command | Purpose |
+|---|---|
+| `pnpm run build` | Build source and test TypeScript output |
+| `pnpm run lint` | ESLint across `src/` and `tests/` |
+| `pnpm run lint:fix` | Auto-fix lint issues |
+| `pnpm run test:unit` | Unit tests (no Jira credentials needed) |
+| `pnpm run test:integration` | Integration tests against a live Jira instance |
+| `pnpm run test` | Full test suite (build + unit + integration) |
+| `pnpm run prettier` | Format `src/` |
+| `pnpm run doc` | Generate TypeDoc documentation |
+
+**Before opening a PR, run at minimum:**
+
+```bash
+pnpm run build && pnpm run lint && pnpm run test:unit
+```
+
+Integration tests require valid Jira credentials and will create/delete real resources in the configured instance.
+
+## Repository layout
+
+```
+src/
+├── agile/           # Agile API client, models, parameters
+├── version2/        # Jira REST API v2
+├── version3/        # Jira REST API v3 (preferred for new work)
+├── serviceDesk/     # Service Desk API
+├── clients/         # BaseClient, HTTP layer, exceptions
+├── services/        # Authentication helpers
+├── interfaces/      # Shared TypeScript interfaces
+├── config.ts        # Client configuration and Zod schema
+├── createClient.ts  # Factory for typed client creation
+└── index.ts         # Public exports
+
+tests/
+├── unit/            # Stubbed HTTP; fast, no credentials
+└── integration/     # Live Jira API; needs .env credentials
+
+examples/            # Usage examples (separate package)
+dist/                # Build output (do not edit manually)
+```
+
+## Architecture patterns
+
+### Client hierarchy
+
+- `BaseClient` — Axios instance, auth headers, `sendRequest()`
+- `Version3Client`, `Version2Client`, `AgileClient`, `ServiceDeskClient` — extend `BaseClient`, expose API group properties (e.g. `client.issues`, `client.projects`)
+
+### API modules
+
+Each API group is a class (e.g. `src/version3/issues.ts`) with methods that:
+
+1. Accept typed `Parameters.*` input
+2. Build a `RequestConfig` (`url`, `method`, `data`, `params`)
+3. Call `this.client.sendRequest(config, callback?)`
+
+Methods use **function overloads** for callback vs. Promise return types.
+
+### Models and parameters
+
+- `src/<api>/models/` — response/request body TypeScript types
+- `src/<api>/parameters/` — method parameter types
+
+JSDoc on methods mirrors Atlassian's official API documentation, including permission requirements and pagination notes.
+
+## Code style
+
+Enforced by ESLint (`eslint.config.ts`):
+
+- **2-space** indentation, **single quotes**, **semicolons**, **trailing commas** in multiline
+- `import type` for type-only imports (`@typescript-eslint/consistent-type-imports`)
+- Blank line before `return` and after import blocks
+- Strict TypeScript (`strict: true` in `tsconfig.json`)
+
+Match existing patterns in the file you are editing. Prefer minimal, focused diffs.
+
+## Testing conventions
+
+### Unit tests (`tests/unit/`)
+
+- Use **Vitest** and **Sinon** to stub `client.sendRequest`
+- Assert the stub was called with the expected `RequestConfig` (URL, method, payload)
+- Import from `@jirajs` alias (maps to `src/`)
+- No network access; safe to run in CI without secrets
+
+Example pattern:
+
+```typescript
+const client = new Version3Client({ host: 'http://localhost' });
+const sendRequestStub = sinon.stub(client, 'sendRequest');
+
+await client.issues.createIssue({ fields: { /* ... */ } });
+
+expect(sendRequestStub.getCall(0).args[0].data).toStrictEqual({ /* expected */ });
+```
+
+### Integration tests (`tests/integration/`)
+
+- Use helpers from `tests/integration/utils/` (`getVersion3Client`, `createSoftwareProject`, `cleanupEnvironment`, etc.)
+- Tests run **sequentially** (`--no-file-parallelism`) to avoid Jira rate limits
+- Always clean up created resources in `afterAll`/`afterEach`
+- Require `.env` with `HOST`, `EMAIL`, `API_TOKEN`
+
+## What to change vs. leave alone
+
+### Safe to modify
+
+- Bug fixes in `src/clients/`, `src/services/`, `src/config.ts`
+- New or corrected API methods, models, or parameters
+- Unit and integration tests
+- Examples in `examples/`
+- Documentation (README, JSDoc)
+
+### Avoid unless explicitly requested
+
+- Hand-editing `dist/` (generated by Rollup)
+- `pnpm-lock.yaml` unless dependencies change
+- Bulk regeneration of API surface (`code:formatting` / `replace:*` scripts) — these are maintainer workflows for syncing with Atlassian OpenAPI specs
+- Publishing or version bumps in `package.json`
+
+## Adding or fixing an API method
+
+1. Locate the API group file under `src/<api>/` (e.g. `src/version3/issues.ts`)
+2. Add/update the method following existing overload + `sendRequest` pattern
+3. Add parameter types in `src/<api>/parameters/`
+4. Add model types in `src/<api>/models/` if needed
+5. Add a unit test stubbing `sendRequest` in `tests/unit/<api>/`
+6. Optionally add an integration test if credentials are available
+7. Run `pnpm run build && pnpm run lint && pnpm run test:unit`
+
+Cross-reference the [Atlassian REST API docs](https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/) for endpoint paths, required fields, and permissions.
+
+## Authentication
+
+The library supports:
+
+- **Basic auth** — email + API token (most common)
+- **OAuth 2.0** — see README for setup
+
+Configuration is validated with Zod (`ConfigSchema` in `src/config.ts`). Invalid host URLs produce a helpful error message.
+
+## CI expectations
+
+GitHub Actions (`.github/workflows/ci.yaml`) runs on all branches:
+
+1. **Build** — Node 20.x and 22.x matrix
+2. **Lint** — after build
+3. **Unit tests** — after build
+4. **Integration tests** — after lint + unit; uses repository secrets
+
+PRs should pass build, lint, and unit tests. Integration test failures due to missing secrets are expected in environments without Jira credentials.
+
+## Commit messages
+
+Use conventional commits when possible:
+
+- `feat:` — new API coverage or features
+- `fix:` — bug fixes
+- `test:` — test additions or fixes
+- `docs:` — documentation only
+- `chore:` — tooling, CI, dependencies
+
+## Useful references
+
+- [Published docs](https://mrrefactoring.github.io/jira.js/)
+- [Jira Cloud REST API v3](https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/)
+- [Jira Agile REST API](https://developer.atlassian.com/cloud/jira/software/rest/intro/)
+- [Jira Service Management REST API](https://developer.atlassian.com/cloud/jira/service-desk/rest/intro/)
